@@ -98,3 +98,19 @@ textarea{min-height:96px}
 }
 .nav-btn svg{width:22px;height:22px}
 .nav-btn.is-active{color:var(--accent)}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px}
+.card-head h2{margin:0}
+.sync-hint{color:var(--muted);font-size:12px;margin:0 0 12px}
+.status-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);color:var(--muted)}
+.status-badge.raw{color:#cbd5e1;border-color:#334155;background:#1e293b}
+.status-badge.draft{color:var(--accent);border-color:rgba(56,189,248,.35);background:rgba(56,189,248,.12)}
+.status-badge.review{color:var(--warn);border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.12)}
+.status-badge.approved{color:var(--ok);border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.12)}
+.status-badge.published{color:#c4b5fd;border-color:rgba(167,139,250,.35);background:rgba(167,139,250,.12)}
+.badge-repo{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;border:1px dashed var(--border);color:var(--muted);margin-left:8px;vertical-align:middle}
+.how-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.how-step{display:flex;gap:12px;align-items:flex-start}
+.how-num{flex:0 0 28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#06121f;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.how-step strong{font-size:14px;display:block;margin-bottom:2px}
+.how-step p{color:var(--muted);font-size:13px;margin:0}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1px dashed var(--border);border-radius:12px;padding:22px 12px;color:var(--muted);font-size:14px;text-align:center}

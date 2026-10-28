@@ -8,7 +8,9 @@
   <title>Content Engine</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
+  <link rel="icon" href="icon-512.png" type="image/png" sizes="512x512">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -39,15 +41,19 @@
     <section class="card">
       <h2>Nahraté vstupy</h2>
       <ul id="capture-list" class="list"></ul>
-      <p id="capture-empty" class="empty">Zatiaľ žiadne vstupy.</p>
+      <p id="capture-empty" class="empty">Zatiaľ žiadne vstupy. Napíš poznámku alebo nahraj zvuk vyššie.</p>
     </section>
   </main>
 
   <main id="view-drafts" class="view hidden">
     <section class="card">
-      <h2>Fronta draftov</h2>
+      <div class="card-head">
+        <h2>Fronta draftov</h2>
+        <button id="refresh-drafts" class="btn btn-small btn-secondary">Obnoviť drafty</button>
+      </div>
+      <p id="draft-sync" class="sync-hint">Naposledy načítané: ešte nikdy</p>
       <ul id="draft-list" class="list"></ul>
-      <p id="draft-empty" class="empty">Žiadne drafty. Pridaj ich zo Zachytenia.</p>
+      <p id="draft-empty" class="empty">Žiadne drafty. Pridaj ich zo Zachytenia alebo stlač „Obnoviť drafty“.</p>
     </section>
   </main>
 
@@ -60,6 +66,16 @@
   </main>
 
   <main id="view-data" class="view hidden">
+    <section class="card">
+      <h2>Ako to funguje</h2>
+      <ol class="how-list">
+        <li class="how-step"><span class="how-num">1</span><div><strong>Nahraj alebo napíš surovinu</strong><p>V „Zachytenie“ zadaj text alebo nahraj hlasovú poznámku. Uloží sa len lokálne v tomto zariadení.</p></div></li>
+        <li class="how-step"><span class="how-num">2</span><div><strong>Pošli ju agentovi</strong><p>Surovinu pošli agentovi cez Telegram alebo chat (ručne — appka sama nič neposiela).</p></div></li>
+        <li class="how-step"><span class="how-num">3</span><div><strong>Agent pripraví drafty</strong><p>Agent z nich pripraví drafty a zapíše ich do repozitára (drafts.json).</p></div></li>
+        <li class="how-step"><span class="how-num">4</span><div><strong>Schváľ a publikuj</strong><p>Stlač „Obnoviť drafty“, načítaj ich do fronty, uprav alebo schváľ a skopíruj text na publikovanie.</p></div></li>
+      </ol>
+      <p class="hint">Toto je reálny manuálny tok — appka negeneruje text modelom ani nič neposiela automaticky.</p>
+    </section>
     <section class="card">
       <h2>Export / Import</h2>
       <p class="hint">Celý stav (poznámky, drafty, archív aj zvukové nahrávky) sa dá preniesť ako jeden JSON súbor medzi telefónom a notebookom.</p>
