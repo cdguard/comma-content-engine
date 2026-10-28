@@ -1,0 +1,29 @@
+[
+  {
+    "id": "d-ukazka-1",
+    "title": "Ako si vybrať bezpečný password manažér (ukážka)",
+    "channel": "web",
+    "body": "Password manažér by mal heslá šifrovať lokálne a synchronizovať len šifrované dáta. Pri výbere sleduj open-source audity, podporu 2FA a to, či master heslo zostáva len na tvojom zariadení.",
+    "status": "review",
+    "createdAt": "2026-10-28T05:00:00.000Z",
+    "updatedAt": "2026-10-28T05:30:00.000Z"
+  },
+  {
+    "id": "d-ukazka-2",
+    "title": "Prečo neklikať na podozrivé prílohy (ukážka)",
+    "channel": "bluesky",
+    "body": "Prílohy z neznámych e-mailov sú najčastejší vektor malvéru. Ak súbor nečakáš, over odosielateľa iným kanálom a neotváraj makrá ani spustiteľné súbory.",
+    "status": "draft",
+    "createdAt": "2026-10-28T05:10:00.000Z",
+    "updatedAt": "2026-10-28T05:10:00.000Z"
+  },
+  {
+    "id": "d-ukazka-3",
+    "title": "Krátka úvaha o nulovej dôvere (ukážka)",
+    "channel": "reddit",
+    "body": "Zero trust neznamená nikomu neveriť, ale overovať pri každom prístupe. Každé zariadenie aj používateľ si musí dôveru získať nanovo, bez trvalých vstupov do siete.",
+    "status": "raw",
+    "createdAt": "2026-10-28T05:20:00.000Z",
+    "updatedAt": "2026-10-28T05:20:00.000Z"
+  }
+]
