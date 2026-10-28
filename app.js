@@ -5,6 +5,8 @@
   var DB_NAME = 'content-engine';
   var DB_VERSION = 1;
   var STORE_AUDIO = 'audio';
+  var REMOTE_DRAFTS_URL = 'https://raw.githubusercontent.com/cdguard/comma-content-engine/main/drafts.json';
+  var LAST_SYNC_KEY = 'ce_last_sync_v1';
 
   var CHANNELS = [
     { id: 'web', label: 'Web' },
@@ -22,6 +24,7 @@
 
   var state = { captures: [], drafts: [], archive: [] };
   var db = null;
+  var currentView = 'capture';
   var currentDraftId = null;
   var mediaRecorder = null;
   var audioChunks = [];
@@ -30,6 +33,7 @@
   var recordTimer = null;
   var recordStart = 0;
   var audioUrls = {};
+  var lastSync = loadLastSync();
 
   function uid() {
     return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
@@ -46,7 +50,7 @@
     try { return new Date(iso).toLocaleString('sk-SK'); } catch (e) { return iso; }
   }
   function shortText(t, n) {
-    t = (t || '').replace(/\s+/g, ' ').trim();
+    t = String(t == null ? '' : t).trim();
     return t.length > n ? t.slice(0, n) + '…' : t;
   }
   function channelLabel(id) {
@@ -60,6 +64,9 @@
   function statusIdx(id) { return STATUSES.findIndex(function (s) { return s.id === id; }); }
   function nextStatusId(id) { var i = statusIdx(id); return (i >= 0 && i < STATUSES.length - 1) ? STATUSES[i + 1].id : null; }
   function prevStatusId(id) { var i = statusIdx(id); return i > 0 ? STATUSES[i - 1].id : null; }
+  function statusBadge(status) {
+    return '<span class="status-badge ' + esc(status) + '">' + esc(statusLabel(status)) + '</span>';
+  }
 
   function loadState() {
     try {
@@ -75,6 +82,104 @@
   function saveState() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
     catch (e) { toast('Nepodarilo sa uložiť: ' + e.message, true); }
+  }
+
+  function loadLastSync() {
+    try {
+      var raw = localStorage.getItem(LAST_SYNC_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return null;
+  }
+  function saveLastSync() {
+    try { localStorage.setItem(LAST_SYNC_KEY, JSON.stringify(lastSync)); }
+    catch (e) {}
+  }
+  function renderSyncState() {
+    var el = $('#draft-sync');
+    if (!el) return;
+    if (lastSync && lastSync.at) {
+      var when = fmtDate(lastSync.at);
+      if (lastSync.status === 'ok') {
+        el.textContent = 'Naposledy načítané: ' + when + (lastSync.count ? ' · ' + lastSync.count + ' z repa' : '');
+      } else if (lastSync.status === 'empty') {
+        el.textContent = 'Naposledy načítané: ' + when + ' · drafts.json sa nenašiel';
+      } else if (lastSync.status === 'error') {
+        el.textContent = 'Naposledy načítané: ' + when + ' · načítanie zlyhalo';
+      } else {
+        el.textContent = 'Naposledy načítané: ' + when;
+      }
+    } else {
+      el.textContent = 'Naposledy načítané: ešte nikdy';
+    }
+  }
+  function setSyncState(status, count) {
+    lastSync = { at: nowIso(), status: status, count: count || 0 };
+    saveLastSync();
+    renderSyncState();
+  }
+
+  function normalizeRemoteDraft(r) {
+    var okStatus = r.status && STATUSES.some(function (s) { return s.id === r.status; });
+    return {
+      id: r.id || ('repo-' + uid()),
+      title: r.title || '(bez názvu)',
+      channel: r.channel || 'web',
+      text: (r.body != null && r.body !== '') ? r.body : (r.text || ''),
+      status: okStatus ? r.status : 'draft',
+      createdAt: r.createdAt || nowIso(),
+      updatedAt: r.updatedAt || r.createdAt || nowIso(),
+      fromRepo: true
+    };
+  }
+  function mergeRemoteDrafts(list) {
+    if (!Array.isArray(list)) return 0;
+    var seen = {};
+    state.drafts.forEach(function (d) { if (d.id) seen[d.id] = true; });
+    state.archive.forEach(function (a) { if (a.id) seen[a.id] = true; });
+    var added = 0;
+    list.forEach(function (r) {
+      if (!r || typeof r !== 'object') return;
+      var n = normalizeRemoteDraft(r);
+      if (seen[n.id]) return;
+      state.drafts.push(n);
+      seen[n.id] = true;
+      added++;
+    });
+    return added;
+  }
+
+  function fetchDrafts() {
+    var btn = $('#refresh-drafts');
+    if (btn) { btn.disabled = true; btn.textContent = 'Načítavam…'; }
+    var url = REMOTE_DRAFTS_URL + '?cb=' + Date.now();
+    fetch(url, { cache: 'no-store' })
+      .then(function (res) {
+        if (res.status === 404) {
+          setSyncState('empty', 0);
+          toast('drafts.json sa nenašiel — appka beží ďalej bez chyby.');
+          return null;
+        }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        if (data === null) return;
+        if (!Array.isArray(data)) throw new Error('bad-format');
+        var added = mergeRemoteDrafts(data);
+        saveState();
+        renderDrafts();
+        setSyncState('ok', added);
+        if (added > 0) toast('Načítané drafty: ' + added + '.');
+        else toast('Drafty sú aktuálne, nič nové.');
+      })
+      .catch(function () {
+        setSyncState('error', 0);
+        toast('Načítanie draftov zlyhalo.', true);
+      })
+      .then(function () {
+        if (btn) { btn.disabled = false; btn.textContent = 'Obnoviť drafty'; }
+      });
   }
 
   function openDb() {
@@ -172,9 +277,9 @@
       mediaRecorder.onstop = function () {
         var type = mediaRecorder.mimeType || 'audio/webm';
         var blob = new Blob(audioChunks, { type: type });
-        var id = uid();
-        idbPut(id, blob).then(function () {
-          state.captures.unshift({ id: uid(), kind: 'audio', audioId: id, text: '', title: 'Zvuková nahrávka', createdAt: nowIso() });
+        var audioId = uid();
+        idbPut(audioId, blob).then(function () {
+          state.captures.unshift({ id: uid(), kind: 'audio', audioId: audioId, text: '', title: 'Zvuková nahrávka', createdAt: nowIso() });
           saveState(); renderCaptures(); toast('Nahrávka uložená.');
         }).catch(function (e) { toast('Uloženie nahrávky zlyhalo: ' + e.message, true); });
         if (recordingStream) { recordingStream.getTracks().forEach(function (t) { t.stop(); }); recordingStream = null; }
@@ -191,7 +296,6 @@
       toast('Prístup k mikrofónu zamietnutý: ' + e.message, true);
     });
   }
-
   function stopRecording() {
     if (mediaRecorder && recording) {
       mediaRecorder.stop();
@@ -201,13 +305,11 @@
       updateRecordButton();
     }
   }
-
   function updateRecordButton() {
     var btn = $('#record-toggle');
     if (recording) { btn.textContent = 'Zastaviť nahrávanie'; btn.classList.add('recording'); }
     else { btn.textContent = 'Spustiť nahrávanie'; btn.classList.remove('recording'); }
   }
-
   $('#record-toggle').addEventListener('click', function () {
     if (recording) stopRecording(); else startRecording();
   });
@@ -216,7 +318,6 @@
     Object.keys(audioUrls).forEach(function (k) { try { URL.revokeObjectURL(audioUrls[k]); } catch (e) {} });
     audioUrls = {};
   }
-
   function renderCaptures() {
     var list = $('#capture-list');
     revokeAudioUrls();
@@ -264,7 +365,6 @@
     var done = function () { state.captures = state.captures.filter(function (x) { return x.id !== id; }); saveState(); renderCaptures(); };
     if (c.kind === 'audio' && c.audioId) { idbDelete(c.audioId).then(done).catch(done); } else done();
   }
-
   function captureToDraft(id) {
     var c = state.captures.filter(function (x) { return x.id === id; })[0];
     if (!c) return;
@@ -274,7 +374,6 @@
     deleteCapture(id);
     saveState(); renderDrafts(); toast('Presunuté do draftov.');
   }
-
   $('#capture-list').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-act]');
     if (!btn) return;
@@ -295,9 +394,10 @@
       li.setAttribute('data-id', d.id);
       var next = nextStatusId(d.status);
       var nextLabel = next === 'published' ? 'Publikovať' : ('→ ' + statusLabel(next));
+      var repoTag = d.fromRepo ? '<span class="badge-repo">z repa</span>' : '';
       li.innerHTML =
-        '<div class="item-title">' + esc(d.title || '(bez názvu)') + '</div>' +
-        '<div class="item-meta">' + esc(channelLabel(d.channel)) + ' · ' + esc(statusLabel(d.status)) + ' · ' + esc(fmtDate(d.updatedAt || d.createdAt)) + '</div>' +
+        '<div class="item-title">' + esc(d.title || '(bez názvu)') + repoTag + '</div>' +
+        '<div class="item-meta">' + esc(channelLabel(d.channel)) + ' · ' + statusBadge(d.status) + ' · ' + esc(fmtDate(d.updatedAt || d.createdAt)) + '</div>' +
         '<div class="item-snippet">' + esc(shortText(d.text, 120)) + '</div>' +
         '<div class="item-actions">' +
           (next ? '<button class="btn btn-small btn-primary" data-act="advance">' + esc(nextLabel) + '</button>' : '') +
@@ -308,7 +408,6 @@
       list.appendChild(li);
     });
   }
-
   function advanceDraft(id) {
     var d = state.drafts.filter(function (x) { return x.id === id; })[0];
     if (!d) return;
@@ -337,7 +436,6 @@
     state.drafts = state.drafts.filter(function (x) { return x.id !== id; });
     saveState(); renderDrafts(); closeModal();
   }
-
   $('#draft-list').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-act]');
     if (!btn) return;
@@ -388,7 +486,6 @@
     var pub = $('#m-publish'); if (pub) pub.addEventListener('click', function () { publishDraft(currentDraftId); });
     var bck = $('#m-back'); if (bck) bck.addEventListener('click', function () { backDraft(currentDraftId); openDraftModal(currentDraftId); });
   }
-
   function saveDraftFromModal() {
     var d = state.drafts.filter(function (x) { return x.id === currentDraftId; })[0];
     if (!d) return;
@@ -418,7 +515,6 @@
       list.appendChild(li);
     });
   }
-
   function copyText(t) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(t).then(function () { toast('Skopírované.'); }, function () { fallbackCopy(t); });
@@ -431,7 +527,6 @@
     try { document.execCommand('copy'); toast('Skopírované.'); } catch (e) { toast('Kopírovanie zlyhalo.', true); }
     document.body.removeChild(ta);
   }
-
   $('#archive-list').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-act]');
     if (!btn) return;
@@ -445,7 +540,6 @@
     else if (act === 'copy') copyText(a.text);
     else if (act === 'delete') { state.archive = state.archive.filter(function (x) { return x.id !== id; }); saveState(); renderArchive(); }
   });
-
   function openArchiveModal(a) {
     currentDraftId = null;
     $('#modal-title').textContent = a.title || '(bez názvu)';
@@ -479,7 +573,6 @@
       });
     return Promise.all(tasks).then(function () { return JSON.stringify(out, null, 2); });
   }
-
   $('#export-btn').addEventListener('click', function () {
     buildExport().then(function (json) {
       var blob = new Blob([json], { type: 'application/json' });
@@ -491,12 +584,10 @@
       toast('Export stiahnutý.');
     }).catch(function (e) { toast('Export zlyhal: ' + e.message, true); });
   });
-
   $('#export-copy').addEventListener('click', function () {
     buildExport().then(function (json) { copyText(json); })
       .catch(function (e) { toast('Export zlyhal: ' + e.message, true); });
   });
-
   $('#import-file').addEventListener('change', function (e) {
     var file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -535,7 +626,6 @@
     renderDrafts();
     renderArchive();
   }
-
   function registerSW() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').then(function () {
@@ -545,20 +635,21 @@
       });
     }
   }
-
   function init() {
     loadState();
+    renderSyncState();
     openDb().then(function () {
       renderAll();
-    }).catch(function (e) {
+    }).catch(function () {
       $('#storage-state').textContent = 'bez zvuku';
       renderAll();
     });
     registerSW();
+    fetchDrafts();
+    $('#refresh-drafts').addEventListener('click', fetchDrafts);
     $('#capture-text').addEventListener('keydown', function (e) {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { $('#capture-save').click(); }
     });
   }
-
   init();
 })();
